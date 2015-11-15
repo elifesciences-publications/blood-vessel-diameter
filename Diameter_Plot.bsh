@@ -16,12 +16,8 @@
  * 
  * >>> source("/path/to/diameter_plot.bsh")
  * 
- * TODO:
- * - Investigate how getProfile() in the ImageJ macro language manages to
- *   only get data without creating the window.
- * 
  * @author Pariksheet Nanda <pariksheet.nanda@uconn.edu> Public Domain
- * @version 2015.10.24
+ * @version 2015.11.15
  */
 
 MIN_AMPLITUDE = 200;
@@ -34,8 +30,8 @@ import ij.ImageStack;
 import ij.WindowManager;
 import ij.gui.ImageWindow;
 import ij.gui.Plot;
+import ij.gui.ProfilePlot;
 import ij.measure.ResultsTable;
-import ij.plugin.Profiler;
 import ij.plugin.filter.MaximumFinder;
 import ij.util.ArrayUtil;
 import ij.util.Tools;
@@ -49,16 +45,6 @@ import java.util.HashSet;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.solvers.AllowedSolution;
 import org.apache.commons.math3.analysis.solvers.BracketingNthOrderBrentSolver;
-
-/** Close image windows whose titles match a given string. */
-void closeMatchingWindows(java.lang.String subString) {
-    ids = WindowManager.getIDList();
-    for (id : ids) {
-    	imp = WindowManager.getImage(id);
-    	if (imp.getTitle().contains(subString))
-    		imp.close();
-    }
-}
 
 /** Return the spline around the center value, or null on failure. */
 makeSpline(double [] x, double [] y, int start, int end) {
@@ -108,7 +94,6 @@ if (impOrig == null) {
     IJ.error("No image is open.");
     return;
 }
-closeMatchingWindows(MAGIC_TITLE_PREFIX);
 mf = new MaximumFinder();
 imPlots = null;
 nSlices = impOrig.getImageStackSize();
@@ -120,20 +105,7 @@ for (n = 1; n <= nSlices; n++)
 // Create a profile for each image.
 for (n : slices) {
 	impOrig.setT((int)n);
-    // Extract line profile data using the Plot Profile plugin, and
-    // close the extraneous plot window.
-    profiler = new Profiler();
-    idsWithoutPlot = new HashSet();
-    for (id : WindowManager.getIDList())
-    	idsWithoutPlot.add(id);
-    profiler.run("");
-    idsWithPlot = new HashSet();
-    for (id : WindowManager.getIDList())
-    	idsWithPlot.add(id);
-	idsWithPlot.removeAll(idsWithoutPlot);
-	idOfPlot = idsWithPlot.toArray()[0];
-    WindowManager.getImage(idOfPlot).close();
-    // Extract the profile data.
+    profiler = new ProfilePlot(impOrig);
     profilerPlot = profiler.getPlot();
     x = Tools.toDouble(profilerPlot.getXValues());
     y = Tools.toDouble(profilerPlot.getYValues());
