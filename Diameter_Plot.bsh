@@ -183,3 +183,8 @@ plot.show();
 plot = new Plot("Interpolated Peak Distances", "Slice", "Distance (um)", slices, distancesInterpUm);
 plot.draw();
 plot.show();
+
+// Local Variables:
+// mode: java
+// tab-width: 4
+// End:
