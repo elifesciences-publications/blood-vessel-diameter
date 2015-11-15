@@ -1,0 +1,213 @@
+/**
+ * List the sub-pixel distance between two peaks using cublic split fit
+ * supervised by ImageJ's built-in MaximumFinder.
+ * 
+ * Input:
+ * - Image stack with one line profile ROI drawn on it.
+ * 
+ * Output:
+ * - Distance between the 2 peaks.  Save the Plot Values by clicking on "List".
+ * - Series of profile plots indicating the selected peaks (for debugging).
+ * 
+ * Development
+ * ----------- 
+ * 
+ * To debug the script, from FIJI, open the Beanshell interpreter and run:
+ * 
+ * >>> source("/path/to/diameter_plot.bsh")
+ * 
+ * TODO:
+ * - Investigate how getProfile() in the ImageJ macro language manages to
+ *   only get data without creating the window.
+ * 
+ * @author Pariksheet Nanda <pariksheet.nanda@uconn.edu> Public Domain
+ * @version 2015.10.24
+ */
+
+MIN_AMPLITUDE = 200;
+NUM_POINTS_TO_FIT_AROUND_PEAK = 2;
+MAGIC_TITLE_PREFIX = "Peaks in ";
+
+import ij.IJ;
+import ij.ImagePlus;
+import ij.ImageStack;
+import ij.WindowManager;
+import ij.gui.ImageWindow;
+import ij.gui.Plot;
+import ij.measure.ResultsTable;
+import ij.plugin.Profiler;
+import ij.plugin.filter.MaximumFinder;
+import ij.util.ArrayUtil;
+import ij.util.Tools;
+
+import java.awt.Color;
+import java.lang.Math;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+
+import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
+import org.apache.commons.math3.analysis.solvers.AllowedSolution;
+import org.apache.commons.math3.analysis.solvers.BracketingNthOrderBrentSolver;
+
+/** Close image windows whose titles match a given string. */
+void closeMatchingWindows(java.lang.String subString) {
+    ids = WindowManager.getIDList();
+    for (id : ids) {
+    	imp = WindowManager.getImage(id);
+    	if (imp.getTitle().contains(subString))
+    		imp.close();
+    }
+}
+
+/** Return the spline around the center value, or null on failure. */
+makeSpline(double [] x, double [] y, int start, int end) {
+	xSubset = Arrays.copyOfRange(x, start, end);
+	ySubset = Arrays.copyOfRange(y, start, end);
+	si = new SplineInterpolator();
+	return si.interpolate(xSubset, ySubset);
+}
+
+/** Get 100 points, including start and excluding end point. */
+range(start, end) {
+	points = 100;
+	values = new double[points];
+	diff = end - start;
+	for (i = 0; i < points; i++)
+		values[i] = start + i * diff / (double)points;
+	return values;
+}
+
+/** Evaluate points of the spline all but last value of x. */
+getSplineValues(spline, xVals) {
+	values = new double[xVals.length];
+	int i = 0;
+	for (xVal : xVals) {
+		// The spline ends prematurely.
+		if (spline.isValidPoint(xVal))
+			values[i] = spline.value(xVal);
+		else
+			break;
+		i++;
+	}
+	return Arrays.copyOfRange(values, 0, i);
+}
+
+/** Get all roots of the spline function. */
+getRoots(spline, start, end) {
+	splineDeriv = spline.derivative();
+	double relativeAccuracy = 1.0e-12;
+	double absoluteAccuracy = 1.0e-8;
+	int maxOrder = 3; // We used a cublic spline function.
+	solver = new BracketingNthOrderBrentSolver(relativeAccuracy, absoluteAccuracy, maxOrder);
+	solver.solve(100, splineDeriv, start, end, AllowedSolution.LEFT_SIDE);
+}
+
+impOrig = WindowManager.getCurrentImage();
+if (impOrig == null) {
+    IJ.error("No image is open.");
+    return;
+}
+closeMatchingWindows(MAGIC_TITLE_PREFIX);
+mf = new MaximumFinder();
+imPlots = null;
+nSlices = impOrig.getImageStackSize();
+distancesUm = new float[nSlices];
+distancesInterpUm = new float[nSlices];
+slices = new float[nSlices];
+for (n = 1; n <= nSlices; n++)
+	slices[n-1] = n;
+// Create a profile for each image.
+for (n : slices) {
+	impOrig.setT((int)n);
+    // Extract line profile data using the Plot Profile plugin, and
+    // close the extraneous plot window.
+    profiler = new Profiler();
+    idsWithoutPlot = new HashSet();
+    for (id : WindowManager.getIDList())
+    	idsWithoutPlot.add(id);
+    profiler.run("");
+    idsWithPlot = new HashSet();
+    for (id : WindowManager.getIDList())
+    	idsWithPlot.add(id);
+	idsWithPlot.removeAll(idsWithoutPlot);
+	idOfPlot = idsWithPlot.toArray()[0];
+    WindowManager.getImage(idOfPlot).close();
+    // Extract the profile data.
+    profilerPlot = profiler.getPlot();
+    x = Tools.toDouble(profilerPlot.getXValues());
+    y = Tools.toDouble(profilerPlot.getYValues());
+    maxima = mf.findMaxima(y, MIN_AMPLITUDE, false);
+    if (maxima.length != 2) {
+    	// TODO Try different amplitude values that yields 2 points.
+    }
+    xMaxima = new ArrayList();
+    yMaxima = new ArrayList();
+    for (maximum : maxima) {
+    	xMaxima.add(x[maximum]);
+    	yMaxima.add(y[maximum]);
+    }
+    // Draw the plot profile.
+    plotTitle = MAGIC_TITLE_PREFIX + impOrig.getTitle();
+    plot = new Plot(plotTitle, "Line (pixels)", "Intensity (arb. units)", x, y);
+    xInterpMaxima = new double[2];
+    yInterpMaxima = new double[2];
+    for (maxi = 0; maxi < maxima.length; maxi++) {
+    	maximum = maxima[maxi];
+    	start = maximum - NUM_POINTS_TO_FIT_AROUND_PEAK;
+		end = maximum + NUM_POINTS_TO_FIT_AROUND_PEAK;
+		if (start < 0 || end > x.length) {
+			// maximum cannot be considered since
+			// NUM_POINTS_TO_FIT_AROUND_PEAK is too large.
+			IJ.error("A line edge is too close to one of the 2 peaks.\n" +
+			         "Please redraw a longer, centered, line ROI and try again.");
+			return;
+		}
+    	spline = makeSpline(x, y, start, end);
+    	xSplineLong = range(x[start], x[end]);
+    	ySpline = getSplineValues(spline, xSplineLong);
+    	// ySpline will be trimmed due to some invalid points, so
+    	// remove those invalid spline points from xSplineLong.
+    	xSpline = Arrays.copyOfRange(xSplineLong, 0, ySpline.length);
+		// Get the roots
+		xInterpMaxima[maxi] = getRoots(spline, xSpline[0], xSpline[xSpline.length - 1]);
+		// Plot the spline
+    	plot.setColor(Color.BLUE);
+    	plot.addPoints(xSpline, ySpline, Plot.LINE);
+    }
+    // FIXME for some reason yInterpMaxima is always null, so we can't display it.
+    yInterpMaxima = getSplineValues(spline, xInterpMaxima);
+    // Plot the roots
+    plot.setColor(Color.RED);
+    plot.setLineWidth(2);
+	plot.addPoints(xInterpMaxima, yInterpMaxima, Plot.CIRCLE);
+    // Plot the seed maxima.
+    plot.setLineWidth(1);
+    plot.setColor(Color.BLACK);
+    plot.addPoints(xMaxima, yMaxima, Plot.CIRCLE);
+    plot.setColor(Color.RED);
+    plot.addLabel(0.00, 0, maxima.length +" maxima");
+    plot.addLabel(0.50, 0, "Min. amp.: "+ IJ.d2s(MIN_AMPLITUDE, 2));
+    plot.draw();
+    // Add the plot profile to a stack.
+    impPlot = plot.getImagePlus();
+    if (imPlots == null)
+        imPlots = new ImageStack(impPlot.getWidth(), impPlot.getHeight());
+    imPlots.addSlice(impPlot.getProcessor());
+    // Record distance.
+    xDiffPx = Math.abs(xMaxima.get(0) - xMaxima.get(1));
+    distancesUm[(int)n-1] = (float)impOrig.getCalibration().getX(xDiffPx);
+    xInterpDiffPx = Math.abs(xInterpMaxima[0] - xInterpMaxima[1]);
+    distancesInterpUm[(int)n-1] = (float)impOrig.getCalibration().getX(xInterpDiffPx);
+}
+// Plot line profiles.
+impPlots = new ImagePlus("All " + plotTitle, imPlots);
+impPlots.show();
+// Plot distances.
+plot = new Plot("Peak Distances", "Slice", "Distance (um)", slices, distancesUm);
+plot.draw();
+plot.show();
+// Plot interpolated distances.
+plot = new Plot("Interpolated Peak Distances", "Slice", "Distance (um)", slices, distancesInterpUm);
+plot.draw();
+plot.show();
