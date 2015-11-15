@@ -128,7 +128,7 @@ for (n : slices) {
     	maximum = maxima[maxi];
     	start = maximum - NUM_POINTS_TO_FIT_AROUND_PEAK;
 		end = maximum + NUM_POINTS_TO_FIT_AROUND_PEAK;
-		if (start < 0 || end > x.length) {
+		if (start < 0 || end >= x.length) {
 			// maximum cannot be considered since
 			// NUM_POINTS_TO_FIT_AROUND_PEAK is too large.
 			IJ.error("A line edge is too close to one of the 2 peaks.\n" +
