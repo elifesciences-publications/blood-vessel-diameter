@@ -46,16 +46,14 @@ import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.solvers.BisectionSolver;
 
 /** Return the spline around the center value, or null on failure. */
-makeSpline(double [] x, double [] y, int start, int end) {
-	xSubset = Arrays.copyOfRange(x, start, end);
-	ySubset = Arrays.copyOfRange(y, start, end);
+makeSpline(double [] x, double [] y) {
 	si = new SplineInterpolator();
-	return si.interpolate(xSubset, ySubset);
+	return si.interpolate(x, y);
 }
 
-/** Get 100 points, including start and excluding end point. */
+/** Get 1000 points, including start and excluding end point. */
 range(start, end) {
-	points = 100;
+	points = 1000;
 	values = new double[points];
 	diff = end - start;
 	for (i = 0; i < points; i++)
@@ -127,55 +125,61 @@ for (n : slices) {
     x = Tools.toDouble(profilerPlot.getXValues());
     y = Tools.toDouble(profilerPlot.getYValues());
     maxima = mf.findMaxima(y, MIN_AMPLITUDE, false);
-    if (maxima.length != 2) {
-    	// TODO Try different amplitude values that yields 2 points.
-    }
     xMaxima = new ArrayList();
     yMaxima = new ArrayList();
+	idxMaxima = new ArrayList();
     for (maximum : maxima) {
     	xMaxima.add(x[maximum]);
     	yMaxima.add(y[maximum]);
+		idxMaxima.add(maximum);
+    }
+	// Trim maxima arrays if there are more than 2 maxima.
+	while (idxMaxima.size() > 2) {
+		val = Collections.max(yMaxima);
+		idx = yMaxima.indexOf(val);
+		xMaxima.remove(idx);
+		yMaxima.remove(idx);
+		idxMaxima.remove(idx);
     }
     // Draw the plot profile.
     plotTitle = MAGIC_TITLE_PREFIX + impOrig.getTitle();
     plot = new Plot(plotTitle, "Line (pixels)", "Intensity (arb. units)", x, y);
     xInterpMaxima = new double[2];
     yInterpMaxima = new double[2];
-    for (maxi = 0; maxi < maxima.length; maxi++) {
-    	maximum = maxima[maxi];
-    	start = maximum - NUM_POINTS_TO_FIT_AROUND_PEAK;
+	spline = makeSpline(x, y);
+    for (maxi = 0; maxi < idxMaxima.size(); maxi++) {
+		maximum = idxMaxima.get(maxi);
+		// Set root search boundaries.
+		start = maximum - NUM_POINTS_TO_FIT_AROUND_PEAK;
 		end = maximum + NUM_POINTS_TO_FIT_AROUND_PEAK;
 		if (start < 0 || end >= x.length) {
 			// maximum cannot be considered since
 			// NUM_POINTS_TO_FIT_AROUND_PEAK is too large.
 			IJ.error("A line edge is too close to one of the 2 peaks.\n" +
-			         "Please redraw a longer, centered, line ROI and try again.");
+					 "Please redraw a longer, centered, line ROI and try again.");
 			return;
 		}
-    	spline = makeSpline(x, y, start, end);
-    	xSplineLong = range(x[start], x[end]);
-    	ySpline = getSplineValues(spline, xSplineLong);
-    	// ySpline will be trimmed due to some invalid points, so
-    	// remove those invalid spline points from xSplineLong.
-    	xSpline = Arrays.copyOfRange(xSplineLong, 0, ySpline.length);
 		// Get the roots
-		xInterpMaxima[maxi] = getRoots(spline, xSpline[0], xSpline[xSpline.length - 1]);
-		// Plot the spline
-    	plot.setColor(Color.BLUE);
-    	plot.addPoints(xSpline, ySpline, Plot.LINE);
+		xInterpMaxima[maxi] = getRoots(spline, x[start], x[end]);
     }
-    // FIXME for some reason yInterpMaxima is always null, so we can't display it.
+	// Plot the spline
+	xSplineLong = range(0, x.length - 1);
+	ySpline = getSplineValues(spline, xSplineLong);
+	// ySpline will be trimmed due to some invalid points, so
+	// remove those invalid spline points from xSplineLong.
+	xSpline = Arrays.copyOfRange(xSplineLong, 0, ySpline.length);
+	plot.setColor(Color.BLUE);
+	plot.addPoints(xSpline, ySpline, Plot.LINE);
     yInterpMaxima = getSplineValues(spline, xInterpMaxima);
     // Plot the roots
-    plot.setColor(Color.RED);
+    plot.setColor(Color.BLUE);
     plot.setLineWidth(2);
 	plot.addPoints(xInterpMaxima, yInterpMaxima, Plot.CIRCLE);
     // Plot the seed maxima.
     plot.setLineWidth(1);
-    plot.setColor(Color.BLACK);
-    plot.addPoints(xMaxima, yMaxima, Plot.CIRCLE);
     plot.setColor(Color.RED);
-    plot.addLabel(0.00, 0, maxima.length +" maxima");
+    plot.addPoints(xMaxima, yMaxima, Plot.CIRCLE);
+    plot.addLabel(0.00, 0, idxMaxima.size() +" maxima");
     plot.addLabel(0.50, 0, "Min. amp.: "+ IJ.d2s(MIN_AMPLITUDE, 2));
     plot.draw();
     // Add the plot profile to a stack.
