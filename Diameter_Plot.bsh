@@ -87,6 +87,25 @@ getRoots(spline, start, end) {
 	return solver.solve(100, splineDeriv, start, end, 0);
 }
 
+/** Get timestamps from Image Info. */
+getTimestamps(imp) {
+	timestamps = new ArrayList();
+	lines = imp.getInfoProperty().split("\n");
+	for (line : lines) {
+		if (line.startsWith("timestamp")) {
+			// Get the last element after the space.
+			s = line.split(" ");
+			timestamp = s[s.length - 1];
+			timestamps.add((float)Tools.parseDouble(timestamp));
+		}
+	}
+	// Convert to float for plot window.
+	times = new float[timestamps.size()];
+	for (i = 0; i < timestamps.size(); i++)
+		times[i] = timestamps.get(i);
+	return times;
+}
+
 impOrig = WindowManager.getCurrentImage();
 if (impOrig == null) {
     IJ.error("No image is open.");
@@ -173,12 +192,14 @@ for (n : slices) {
 // Plot line profiles.
 impPlots = new ImagePlus("All " + plotTitle, imPlots);
 impPlots.show();
+// Get timestamps.
+times = getTimestamps(impOrig);
 // Plot distances.
-plot = new Plot("Peak Distances", "Slice", "Distance (um)", slices, distancesUm);
+plot = new Plot("Peak Distances", "Time (s)", "Distance (um)", times, distancesUm);
 plot.draw();
 plot.show();
 // Plot interpolated distances.
-plot = new Plot("Interpolated Peak Distances", "Slice", "Distance (um)", slices, distancesInterpUm);
+plot = new Plot("Interpolated Peak Distances", "Time (s)", "Distance (um)", times, distancesInterpUm);
 plot.draw();
 plot.show();
 
