@@ -90,7 +90,7 @@ getTimestamps(imp) {
     timestamps = new ArrayList();
     lines = imp.getInfoProperty().split("\n");
     for (line : lines) {
-        if (line.startsWith("timestamp")) {
+        if (line.toLowerCase().startsWith("timestamp")) {
             // Get the last element after the space.
             s = line.split(" ");
             timestamp = s[s.length - 1];
