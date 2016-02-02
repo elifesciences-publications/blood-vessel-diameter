@@ -17,9 +17,10 @@
  *     source("/path/to/Diameter_Plot.bsh");
  * 
  * @author Pariksheet Nanda <pariksheet.nanda@uconn.edu> Public Domain
- * @version 2016.02.01-SNAPSHOT
+ * @version 2016.02.01
  */
 
+IGNORE_ERRORS = true;
 MIN_AMPLITUDE = 500;
 NUM_POINTS_TO_FIT_AROUND_PEAK = 2;
 MAGIC_TITLE_PREFIX = "Peaks in ";
@@ -190,10 +191,22 @@ for (n : slices) {
         imPlots = new ImageStack(impPlot.getWidth(), impPlot.getHeight());
     imPlots.addSlice(impPlot.getProcessor());
     // Record distance.
-    xDiffPx = Math.abs(xMaxima.get(0) - xMaxima.get(1));
-    distancesUm[(int)n-1] = (float)impOrig.getCalibration().getX(xDiffPx);
-    xInterpDiffPx = Math.abs(xInterpMaxima[0] - xInterpMaxima[1]);
-    distancesInterpUm[(int)n-1] = (float)impOrig.getCalibration().getX(xInterpDiffPx);
+    if (idxMaxima.size() >= 2) {
+        xDiffPx = Math.abs(xMaxima.get(0) - xMaxima.get(1));
+        distancesUm[(int)n-1] = (float)impOrig.getCalibration().getX(xDiffPx);
+        xInterpDiffPx = Math.abs(xInterpMaxima[0] - xInterpMaxima[1]);
+        distancesInterpUm[(int)n-1] = (float)impOrig.getCalibration().getX(xInterpDiffPx);
+    }
+    else {
+        msg = "Could not find the required 2 peaks at slice " + (int)n;
+        if (! IGNORE_ERRORS) {
+            IJ.error(msg);
+            return;
+        }
+        else {
+            print("Warning: " + msg);
+        }
+    }
 }
 // Plot line profiles.
 impPlots = new ImagePlus("All " + plotTitle, imPlots);
