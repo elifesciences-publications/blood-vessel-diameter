@@ -17,7 +17,7 @@
  * >>> source("/path/to/diameter_plot.bsh")
  * 
  * @author Pariksheet Nanda <pariksheet.nanda@uconn.edu> Public Domain
- * @version 2015.11.15
+ * @version 2016.02.01-SNAPSHOT
  */
 
 MIN_AMPLITUDE = 500;
@@ -47,61 +47,61 @@ import org.apache.commons.math3.analysis.solvers.BisectionSolver;
 
 /** Return the spline around the center value, or null on failure. */
 makeSpline(double [] x, double [] y) {
-	si = new SplineInterpolator();
-	return si.interpolate(x, y);
+    si = new SplineInterpolator();
+    return si.interpolate(x, y);
 }
 
 /** Get 1000 points, including start and excluding end point. */
 range(start, end) {
-	points = 1000;
-	values = new double[points];
-	diff = end - start;
-	for (i = 0; i < points; i++)
-		values[i] = start + i * diff / (double)points;
-	return values;
+    points = 1000;
+    values = new double[points];
+    diff = end - start;
+    for (i = 0; i < points; i++)
+        values[i] = start + i * diff / (double)points;
+    return values;
 }
 
 /** Evaluate points of the spline all but last value of x. */
 getSplineValues(spline, xVals) {
-	values = new double[xVals.length];
-	int i = 0;
-	for (xVal : xVals) {
-		// The spline ends prematurely.
-		if (spline.isValidPoint(xVal))
-			values[i] = spline.value(xVal);
-		else
-			break;
-		i++;
-	}
-	return Arrays.copyOfRange(values, 0, i);
+    values = new double[xVals.length];
+    int i = 0;
+    for (xVal : xVals) {
+        // The spline ends prematurely.
+        if (spline.isValidPoint(xVal))
+            values[i] = spline.value(xVal);
+        else
+            break;
+        i++;
+    }
+    return Arrays.copyOfRange(values, 0, i);
 }
 
 /** Get all roots of the spline function. */
 getRoots(spline, start, end) {
-	splineDeriv = spline.derivative();
-	double relativeAccuracy = 1.0e-12;
-	double absoluteAccuracy = 1.0e-8;
-	solver = new BisectionSolver(relativeAccuracy, absoluteAccuracy);
-	return solver.solve(100, splineDeriv, start, end, 0);
+    splineDeriv = spline.derivative();
+    double relativeAccuracy = 1.0e-12;
+    double absoluteAccuracy = 1.0e-8;
+    solver = new BisectionSolver(relativeAccuracy, absoluteAccuracy);
+    return solver.solve(100, splineDeriv, start, end, 0);
 }
 
 /** Get timestamps from Image Info. */
 getTimestamps(imp) {
-	timestamps = new ArrayList();
-	lines = imp.getInfoProperty().split("\n");
-	for (line : lines) {
-		if (line.startsWith("timestamp")) {
-			// Get the last element after the space.
-			s = line.split(" ");
-			timestamp = s[s.length - 1];
-			timestamps.add((float)Tools.parseDouble(timestamp));
-		}
-	}
-	// Convert to float for plot window.
-	times = new float[timestamps.size()];
-	for (i = 0; i < timestamps.size(); i++)
-		times[i] = timestamps.get(i);
-	return times;
+    timestamps = new ArrayList();
+    lines = imp.getInfoProperty().split("\n");
+    for (line : lines) {
+        if (line.startsWith("timestamp")) {
+            // Get the last element after the space.
+            s = line.split(" ");
+            timestamp = s[s.length - 1];
+            timestamps.add((float)Tools.parseDouble(timestamp));
+        }
+    }
+    // Convert to float for plot window.
+    times = new float[timestamps.size()];
+    for (i = 0; i < timestamps.size(); i++)
+        times[i] = timestamps.get(i);
+    return times;
 }
 
 impOrig = WindowManager.getCurrentImage();
@@ -116,10 +116,10 @@ distancesUm = new float[nSlices];
 distancesInterpUm = new float[nSlices];
 slices = new float[nSlices];
 for (n = 1; n <= nSlices; n++)
-	slices[n-1] = n;
+    slices[n-1] = n;
 // Create a profile for each image.
 for (n : slices) {
-	impOrig.setT((int)n);
+    impOrig.setT((int)n);
     profiler = new ProfilePlot(impOrig);
     profilerPlot = profiler.getPlot();
     x = Tools.toDouble(profilerPlot.getXValues());
@@ -127,54 +127,56 @@ for (n : slices) {
     maxima = mf.findMaxima(y, MIN_AMPLITUDE, false);
     xMaxima = new ArrayList();
     yMaxima = new ArrayList();
-	idxMaxima = new ArrayList();
+    idxMaxima = new ArrayList();
     for (maximum : maxima) {
-    	xMaxima.add(x[maximum]);
-    	yMaxima.add(y[maximum]);
-		idxMaxima.add(maximum);
+        xMaxima.add(x[maximum]);
+        yMaxima.add(y[maximum]);
+        idxMaxima.add(maximum);
     }
-	// Trim maxima arrays if there are more than 2 maxima.
-	while (idxMaxima.size() > 2) {
-		val = Collections.max(yMaxima);
-		idx = yMaxima.indexOf(val);
-		xMaxima.remove(idx);
-		yMaxima.remove(idx);
-		idxMaxima.remove(idx);
+    // Trim maxima arrays if there are more than 2 maxima.
+    while (idxMaxima.size() > 2) {
+        val = Collections.max(yMaxima);
+        idx = yMaxima.indexOf(val);
+        xMaxima.remove(idx);
+        yMaxima.remove(idx);
+        idxMaxima.remove(idx);
     }
     // Draw the plot profile.
     plotTitle = MAGIC_TITLE_PREFIX + impOrig.getTitle();
     plot = new Plot(plotTitle, "Line (pixels)", "Intensity (arb. units)", x, y);
     xInterpMaxima = new double[2];
     yInterpMaxima = new double[2];
-	spline = makeSpline(x, y);
+    spline = makeSpline(x, y);
     for (maxi = 0; maxi < idxMaxima.size(); maxi++) {
-		maximum = idxMaxima.get(maxi);
-		// Set root search boundaries.
-		start = maximum - NUM_POINTS_TO_FIT_AROUND_PEAK;
-		end = maximum + NUM_POINTS_TO_FIT_AROUND_PEAK;
-		if (start < 0 || end >= x.length) {
-			// maximum cannot be considered since
-			// NUM_POINTS_TO_FIT_AROUND_PEAK is too large.
-			IJ.error("A line edge is too close to one of the 2 peaks.\n" +
-					 "Please redraw a longer, centered, line ROI and try again.");
-			return;
-		}
-		// Get the roots
-		xInterpMaxima[maxi] = getRoots(spline, x[start], x[end]);
+        maximum = idxMaxima.get(maxi);
+        // Set root search boundaries.
+        start = maximum - NUM_POINTS_TO_FIT_AROUND_PEAK;
+        end = maximum + NUM_POINTS_TO_FIT_AROUND_PEAK;
+        if (start < 0 || end >= x.length) {
+            continue;
+            // maximum cannot be considered since
+            // NUM_POINTS_TO_FIT_AROUND_PEAK is too large.
+            IJ.error("A line edge is too close to one of the 2 peaks.\n" +
+                     "Please redraw a longer, centered, line ROI and try again.");
+            return;
+        }
+        // Get the roots
+        xInterpMaxima[maxi] = getRoots(spline, x[start], x[end]);
     }
-	// Plot the spline
-	xSplineLong = range(0, x.length - 1);
-	ySpline = getSplineValues(spline, xSplineLong);
-	// ySpline will be trimmed due to some invalid points, so
-	// remove those invalid spline points from xSplineLong.
-	xSpline = Arrays.copyOfRange(xSplineLong, 0, ySpline.length);
-	plot.setColor(Color.BLUE);
-	plot.addPoints(xSpline, ySpline, Plot.LINE);
+    // Plot the spline
+    xSplineLong = range(0, x.length - 1);
+    ySpline = getSplineValues(spline, xSplineLong);
+    // ySpline will be trimmed due to some invalid points, so
+    // remove those invalid spline points from xSplineLong.
+    //xSpline = Arrays.copyOfRange(xSplineLong, 0, ySpline.length);
+    xSpline = xSplineLong;
+    plot.setColor(Color.BLUE);
+    plot.addPoints(xSpline, ySpline, Plot.LINE);
     yInterpMaxima = getSplineValues(spline, xInterpMaxima);
     // Plot the roots
     plot.setColor(Color.BLUE);
     plot.setLineWidth(2);
-	plot.addPoints(xInterpMaxima, yInterpMaxima, Plot.CIRCLE);
+    plot.addPoints(xInterpMaxima, yInterpMaxima, Plot.CIRCLE);
     // Plot the seed maxima.
     plot.setLineWidth(1);
     plot.setColor(Color.RED);
