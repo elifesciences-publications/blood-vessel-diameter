@@ -14,7 +14,7 @@
  * 
  * To debug the script, from FIJI, open the Beanshell interpreter and run:
  * 
- * >>> source("/path/to/diameter_plot.bsh")
+ *     source("/path/to/Diameter_Plot.bsh");
  * 
  * @author Pariksheet Nanda <pariksheet.nanda@uconn.edu> Public Domain
  * @version 2016.02.01-SNAPSHOT
