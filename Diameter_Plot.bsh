@@ -16,7 +16,7 @@
  * 
  *     source("/path/to/Diameter_Plot.bsh");
  * 
- * @author Pariksheet Nanda <pariksheet.nanda@uconn.edu> Public Domain
+ * @author Pariksheet Nanda <pariksheet.nanda@uconn.edu> MIT
  * @version 2016.02.01
  */
 
